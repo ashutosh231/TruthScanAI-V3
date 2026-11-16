@@ -153,45 +153,66 @@ async function request(endpoint, options = {}) {
 const delay = (ms = 700) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Fetch latest news articles
+ * Fetch latest news articles or search the live web for news
  */
-export async function getNews(category = "all") {
+export async function getNews(category = "all", options = {}) {
   try {
-    const query = category && category !== "all" ? `?category=${encodeURIComponent(category)}` : "";
-    const res = await request(`/news${query}`, { method: "GET" });
+    const params = new URLSearchParams();
+    if (category && category !== "all") params.append("category", category);
+    if (options.q || options.search) params.append("q", options.q || options.search);
+    if (options.refresh) params.append("refresh", "true");
+
+    const queryStr = params.toString() ? `?${params.toString()}` : "";
+    const res = await request(`/news${queryStr}`, { method: "GET" });
     return {
       success: true,
       count: res.count || res.data?.length || 0,
       data: res.data || [],
       cached: res.cached || false,
+      query: res.query || options.q || "",
     };
   } catch {
     await delay(600);
-    if (!category || category === "all") {
-      return { success: true, count: MOCK_NEWS.length, data: MOCK_NEWS };
+    let items = MOCK_NEWS;
+    const q = options.q || options.search;
+    if (q) {
+      const qLower = q.toLowerCase();
+      items = items.filter(
+        (item) =>
+          (item.title || "").toLowerCase().includes(qLower) ||
+          (item.description || "").toLowerCase().includes(qLower)
+      );
     }
-    const filtered = MOCK_NEWS.filter(
-      (item) => item.category?.toLowerCase() === category.toLowerCase()
-    );
-    return { success: true, count: filtered.length, data: filtered };
+    if (category && category !== "all") {
+      items = items.filter(
+        (item) => item.category?.toLowerCase() === category.toLowerCase()
+      );
+    }
+    return { success: true, count: items.length, data: items, cached: false };
   }
 }
 
 /**
- * Explicitly refresh news cache from provider
+ * Explicitly refresh news cache from provider and live web
  */
-export async function refreshNews(category = "all") {
+export async function refreshNews(category = "all", q = "") {
   try {
-    const query = category && category !== "all" ? `?category=${encodeURIComponent(category)}` : "";
-    const res = await request(`/news/refresh${query}`, { method: "GET" });
+    const params = new URLSearchParams();
+    if (category && category !== "all") params.append("category", category);
+    if (q) params.append("q", q);
+
+    const queryStr = params.toString() ? `?${params.toString()}` : "";
+    const res = await request(`/news/refresh${queryStr}`, { method: "GET" });
     return {
       success: true,
       count: res.count || res.data?.length || 0,
       data: res.data || [],
+      cached: false,
+      query: res.query || q,
     };
   } catch {
     await delay(700);
-    return { success: true, count: MOCK_NEWS.length, data: MOCK_NEWS };
+    return { success: true, count: MOCK_NEWS.length, data: MOCK_NEWS, cached: false };
   }
 }
 
@@ -897,5 +918,240 @@ export async function verifyPayment(paymentData) {
   return await request("/payments/verify", {
     method: "POST",
     body: JSON.stringify(paymentData),
+  });
+}
+
+// ============================================================================
+// TruthScan Dedicated Administrator APIs
+// ============================================================================
+
+export async function adminLogin(credentials) {
+  const res = await request("/admin/login", {
+    method: "POST",
+    body: JSON.stringify(credentials),
+  });
+  if (res?.data?.accessToken) {
+    setAuthToken(res.data.accessToken);
+    if (typeof window !== "undefined") {
+      try {
+        const token = res.data.accessToken;
+        const userStr = JSON.stringify(res.data.user);
+        sessionStorage.setItem("truthscan_admin_token", token);
+        sessionStorage.setItem("truthscan_admin_user", userStr);
+        localStorage.setItem("truthscan_admin_token", token);
+        localStorage.setItem("truthscan_admin_user", userStr);
+
+        // Also sync to regular user session keys so full application context knows admin is authenticated
+        sessionStorage.setItem("truthscan_access_token", token);
+        sessionStorage.setItem("truthscan_user_session", userStr);
+        localStorage.setItem("truthscan_access_token", token);
+        localStorage.setItem("truthscan_user_session", userStr);
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return res;
+}
+
+export async function adminLogout() {
+  try {
+    await request("/admin/logout", { method: "POST" });
+  } catch {
+    // ignore
+  } finally {
+    setAuthToken(null);
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem("truthscan_admin_token");
+        sessionStorage.removeItem("truthscan_admin_user");
+        localStorage.removeItem("truthscan_admin_token");
+        localStorage.removeItem("truthscan_admin_user");
+        sessionStorage.removeItem("truthscan_access_token");
+        sessionStorage.removeItem("truthscan_user_session");
+        localStorage.removeItem("truthscan_access_token");
+        localStorage.removeItem("truthscan_user_session");
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return { success: true };
+}
+
+export async function getAdminProfile() {
+  return await request("/admin/profile", { method: "GET" });
+}
+
+export async function getAdminStats() {
+  return await request("/admin/dashboard/stats", { method: "GET" });
+}
+
+export async function getAdminCharts(period = "30d") {
+  return await request(`/admin/dashboard/charts?period=${encodeURIComponent(period)}`, {
+    method: "GET",
+  });
+}
+
+export async function getAdminUsers(params = {}) {
+  const query = new URLSearchParams();
+  if (params.page) query.set("page", params.page);
+  if (params.limit) query.set("limit", params.limit);
+  if (params.search) query.set("search", params.search);
+  if (params.role) query.set("role", params.role);
+  if (params.status) query.set("status", params.status);
+  if (params.dateFrom) query.set("dateFrom", params.dateFrom);
+  if (params.dateTo) query.set("dateTo", params.dateTo);
+
+  const qs = query.toString() ? `?${query.toString()}` : "";
+  return await request(`/admin/users${qs}`, { method: "GET" });
+}
+
+export async function getAdminUserDetail(userId) {
+  return await request(`/admin/users/${userId}`, { method: "GET" });
+}
+
+export async function createAdminUser(userData) {
+  return await request("/admin/users", {
+    method: "POST",
+    body: JSON.stringify(userData),
+  });
+}
+
+export async function updateAdminUser(userId, data) {
+  return await request(`/admin/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteAdminUser(userId, hard = false) {
+  return await request(`/admin/users/${userId}${hard ? "?hard=true" : ""}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getAdminFactChecks(params = {}) {
+  const query = new URLSearchParams();
+  if (params.page) query.set("page", params.page);
+  if (params.limit) query.set("limit", params.limit);
+  if (params.search) query.set("search", params.search);
+  if (params.verdict) query.set("verdict", params.verdict);
+  if (params.category) query.set("category", params.category);
+  if (params.userId) query.set("userId", params.userId);
+  if (params.dateFrom) query.set("dateFrom", params.dateFrom);
+  if (params.dateTo) query.set("dateTo", params.dateTo);
+  if (params.sortBy) query.set("sortBy", params.sortBy);
+
+  const qs = query.toString() ? `?${query.toString()}` : "";
+  return await request(`/admin/fact-checks${qs}`, { method: "GET" });
+}
+
+export async function getAdminFactCheckDetail(id) {
+  return await request(`/admin/fact-checks/${id}`, { method: "GET" });
+}
+
+export async function deleteAdminFactCheck(id) {
+  return await request(`/admin/fact-checks/${id}`, { method: "DELETE" });
+}
+
+export async function reviewAdminFactCheck(id, reviewData) {
+  return await request(`/admin/fact-checks/${id}/review`, {
+    method: "POST",
+    body: JSON.stringify(reviewData),
+  });
+}
+
+export async function getAdminNews(params = {}) {
+  const query = new URLSearchParams();
+  if (params.page) query.set("page", params.page);
+  if (params.limit) query.set("limit", params.limit);
+  if (params.search) query.set("search", params.search);
+  if (params.category) query.set("category", params.category);
+  if (params.status) query.set("status", params.status);
+  if (params.dateFrom) query.set("dateFrom", params.dateFrom);
+  if (params.dateTo) query.set("dateTo", params.dateTo);
+
+  const qs = query.toString() ? `?${query.toString()}` : "";
+  return await request(`/admin/news${qs}`, { method: "GET" });
+}
+
+export async function getAdminNewsDetail(id) {
+  return await request(`/admin/news/${id}`, { method: "GET" });
+}
+
+export async function createAdminNews(newsData) {
+  return await request("/admin/news", {
+    method: "POST",
+    body: JSON.stringify(newsData),
+  });
+}
+
+export async function updateAdminNews(id, newsData) {
+  return await request(`/admin/news/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(newsData),
+  });
+}
+
+export async function deleteAdminNews(id) {
+  return await request(`/admin/news/${id}`, { method: "DELETE" });
+}
+
+export async function getAdminCategories() {
+  return await request("/admin/categories", { method: "GET" });
+}
+
+export async function createAdminCategory(catData) {
+  return await request("/admin/categories", {
+    method: "POST",
+    body: JSON.stringify(catData),
+  });
+}
+
+export async function updateAdminCategory(id, catData) {
+  return await request(`/admin/categories/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(catData),
+  });
+}
+
+export async function deleteAdminCategory(id, reassignToSlug = "") {
+  const qs = reassignToSlug ? `?reassignToSlug=${encodeURIComponent(reassignToSlug)}` : "";
+  return await request(`/admin/categories/${id}${qs}`, { method: "DELETE" });
+}
+
+export async function getAdminAiMonitoring() {
+  return await request("/admin/monitoring/ai", { method: "GET" });
+}
+
+export async function getAdminActivityLogs(params = {}) {
+  const query = new URLSearchParams();
+  if (params.page) query.set("page", params.page);
+  if (params.limit) query.set("limit", params.limit);
+  if (params.action) query.set("action", params.action);
+  if (params.adminId) query.set("adminId", params.adminId);
+  if (params.dateFrom) query.set("dateFrom", params.dateFrom);
+  if (params.dateTo) query.set("dateTo", params.dateTo);
+
+  const qs = query.toString() ? `?${query.toString()}` : "";
+  return await request(`/admin/activity-logs${qs}`, { method: "GET" });
+}
+
+export async function getAdminSettings() {
+  return await request("/admin/settings", { method: "GET" });
+}
+
+export async function updateAdminSettings(settingsData) {
+  return await request("/admin/settings", {
+    method: "PATCH",
+    body: JSON.stringify(settingsData),
+  });
+}
+
+export async function changeAdminPassword(data) {
+  return await request("/admin/settings/change-password", {
+    method: "POST",
+    body: JSON.stringify(data),
   });
 }
