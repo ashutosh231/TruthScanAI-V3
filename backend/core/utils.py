@@ -260,7 +260,7 @@ def generate_otp():
     """Generates a secure 6-digit OTP code."""
     return str(secrets.randbelow(900000) + 100000)
 
-def _send_smtp_payload(recipient_email, otp):
+def _send_smtp_payload(recipient_email, otp, purpose="verification"):
     """
     Direct synchronous SMTP dispatch via Brevo or configured host.
     """
@@ -275,17 +275,30 @@ def _send_smtp_payload(recipient_email, otp):
         print("[EmailService] Warning: SMTP_PASS not set. Skipping SMTP dispatch.")
         return False
 
+    is_reset = purpose == "password reset"
+    title_text = "TruthScan AI - Password Reset" if is_reset else "TruthScan AI"
+    action_text = (
+        "Use the following 6-digit verification code to reset your account password and restore terminal access."
+        if is_reset
+        else "Use the following 6-digit verification code to activate your account clearance."
+    )
+    subject_text = (
+        f"TruthScan AI - Password Reset Code: {otp}"
+        if is_reset
+        else f"Your TruthScan AI Verification Code: {otp}"
+    )
+
     html_content = f"""
       <div style="font-family: Arial, sans-serif; background-color: #F5F1E8; padding: 24px; color: #111111;">
         <div style="max-width: 500px; margin: 0 auto; background: #ffffff; border: 2px solid #111111; padding: 32px; box-shadow: 4px 4px 0px #111111;">
           <h2 style="font-size: 24px; font-weight: bold; text-transform: uppercase; margin-top: 0; color: #111111; border-bottom: 2px solid #111111; padding-bottom: 12px;">
-            TruthScan AI
+            {title_text}
           </h2>
           <p style="font-size: 14px; line-height: 1.6; color: #333333;">
             Hello investigator,
           </p>
           <p style="font-size: 14px; line-height: 1.6; color: #333333;">
-            Use the following 6-digit verification code to activate your account clearance.
+            {action_text}
             This code will expire in <strong>5 minutes</strong>.
           </p>
           <div style="text-align: center; margin: 28px 0;">
@@ -294,14 +307,14 @@ def _send_smtp_payload(recipient_email, otp):
             </span>
           </div>
           <p style="font-size: 12px; color: #666666; line-height: 1.5; border-top: 1px solid #eeeeee; padding-top: 16px;">
-            If you did not request this verification code, please disregard this email.
+            If you did not request this code, please disregard this email or secure your account credentials.
           </p>
         </div>
       </div>
     """
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"Your TruthScan AI Verification Code: {otp}"
+    msg["Subject"] = subject_text
     msg["From"] = f'"{from_name}" <{from_email}>'
     msg["To"] = recipient_email
     msg.attach(MIMEText(html_content, "html"))
@@ -321,18 +334,18 @@ def _send_smtp_payload(recipient_email, otp):
         print(f"[EmailService] Notice: SMTP delivery note ({type(e).__name__}): {e}")
         return False
 
-def send_otp_email(recipient_email, otp, run_async=True):
+def send_otp_email(recipient_email, otp, run_async=True, purpose="verification"):
     """
     Directly dispatches verification OTP email to recipient without external background workers.
     Always logs generated OTP to standard output so verification never blocks in development/unauthorized-IP environments.
     """
-    print(f"[EmailService] Generated OTP for {recipient_email}: {otp}")
+    print(f"[EmailService] Generated OTP for {recipient_email} ({purpose}): {otp}")
 
     if run_async:
-        t = threading.Thread(target=_send_smtp_payload, args=(recipient_email, otp), daemon=True)
+        t = threading.Thread(target=_send_smtp_payload, args=(recipient_email, otp, purpose), daemon=True)
         t.start()
         return True
-    return _send_smtp_payload(recipient_email, otp)
+    return _send_smtp_payload(recipient_email, otp, purpose)
 
 
 # ============================================================================

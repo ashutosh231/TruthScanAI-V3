@@ -38,6 +38,9 @@ from accounts.serializers import (
     VerifyOtpSerializer,
     LoginSerializer,
     UpdateProfileSerializer,
+    ForgotPasswordSerializer,
+    VerifyResetOtpSerializer,
+    ResetPasswordSerializer,
 )
 from accounts.services import (
     hash_password,
@@ -336,6 +339,155 @@ class LoginView(APIView):
         )
         set_refresh_cookie(response, refresh_token)
         return response
+
+
+class ForgotPasswordView(APIView):
+    """
+    POST /api/auth/forgot-password
+    Dispatches a 6-digit password reset OTP to the user's email.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    @send_otp_rate_limit
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "message": "A valid email address is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"].lower().strip()
+        users_col = get_users_collection()
+        user = users_col.find_one({"email": email})
+
+        if not user:
+            return Response(
+                {"success": False, "message": "No registered account found with this email address."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        otp = generate_otp()
+        redis_client = get_redis_client()
+        redis_client.set(f"reset_otp:{email}", otp, ex=OTP_TTL_SECONDS)
+
+        # Dispatch email with purpose="password reset"
+        try:
+            send_otp_email(email, otp, purpose="password reset")
+        except Exception as e:
+            print(f"[ForgotPasswordView] Email dispatch warning: {e}")
+
+        return Response(
+            {
+                "success": True,
+                "message": "Password reset code dispatched to your email address.",
+                "data": {"email": email},
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class VerifyResetOtpView(APIView):
+    """
+    POST /api/auth/verify-reset-otp
+    Validates that the supplied OTP matches the active reset_otp in cache.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    @verify_otp_rate_limit
+    def post(self, request):
+        serializer = VerifyResetOtpSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "message": "Email and 6-digit OTP code are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"].lower().strip()
+        otp = serializer.validated_data["otp"].strip()
+
+        redis_client = get_redis_client()
+        cached_otp = redis_client.get(f"reset_otp:{email}")
+
+        if not cached_otp or cached_otp != otp:
+            return Response(
+                {"success": False, "message": "Invalid or expired reset code. Please request a new code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "success": True,
+                "message": "Reset code verified successfully. Please enter your new password.",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ResetPasswordView(APIView):
+    """
+    POST /api/auth/reset-password
+    Verifies the reset OTP and sets a new securely-hashed password.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        if not serializer.is_valid():
+            first_err = list(serializer.errors.values())[0][0]
+            return Response(
+                {"success": False, "message": str(first_err)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"].lower().strip()
+        otp = serializer.validated_data["otp"].strip()
+        new_password = serializer.validated_data["newPassword"]
+
+        if len(new_password) < 6:
+            return Response(
+                {"success": False, "message": "New password must be at least 6 characters long."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        redis_client = get_redis_client()
+        cached_otp = redis_client.get(f"reset_otp:{email}")
+
+        if not cached_otp or cached_otp != otp:
+            return Response(
+                {"success": False, "message": "Invalid or expired reset code. Please request a new code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        users_col = get_users_collection()
+        user = users_col.find_one({"email": email})
+        if not user:
+            return Response(
+                {"success": False, "message": "Account not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        hashed = hash_password(new_password)
+        now = datetime.now(timezone.utc)
+        users_col.update_one(
+            {"email": email},
+            {"$set": {"password": hashed, "updatedAt": now}},
+        )
+
+        # Invalidate OTP immediately so it cannot be used again
+        redis_client.delete(f"reset_otp:{email}")
+
+        return Response(
+            {
+                "success": True,
+                "message": "Your password has been reset successfully. You may now log in.",
+            },
+            status=status.HTTP_200_OK,
+        )
+
 
 
 class RefreshTokenView(APIView):

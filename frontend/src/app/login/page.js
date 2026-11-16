@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import Button from "@/components/Button";
 import ErrorState from "@/components/ErrorState";
-import { Lock, Mail, ArrowRight, Zap } from "lucide-react";
+import ForgotPasswordModal from "@/components/ForgotPasswordModal";
+import { Lock, Mail, ArrowRight, Zap, CheckCircle2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,10 +16,13 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [forgotModalOpen, setForgotModalOpen] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
 
     try {
       await login({ email, password });
@@ -31,6 +35,8 @@ export default function LoginPage() {
   const handleFillDemo = () => {
     setEmail("investigator@truthscan.ai");
     setPassword("audit-neural-pass-2026");
+    setSuccessMessage(null);
+    setError(null);
   };
 
   return (
@@ -47,6 +53,20 @@ export default function LoginPage() {
           Enter credentials to access telemetry logs and custom detection models.
         </p>
       </div>
+
+      {successMessage && (
+        <div className="border-2 border-[#111111] bg-[#B7FF3C] p-4 shadow-hard-sm flex items-start gap-2.5 animate-in fade-in">
+          <CheckCircle2 className="w-5 h-5 text-[#111111] shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <div className="font-mono-tech text-xs font-bold uppercase text-[#111111]">
+              CREDENTIALS UPDATED
+            </div>
+            <div className="font-mono-tech text-xs text-[#111111]/90">
+              {successMessage}
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <ErrorState
@@ -85,7 +105,11 @@ export default function LoginPage() {
               </label>
               <button
                 type="button"
-                onClick={() => alert("Password reset token dispatched to terminal administrator.")}
+                onClick={() => {
+                  setError(null);
+                  setSuccessMessage(null);
+                  setForgotModalOpen(true);
+                }}
                 className="font-mono-tech text-[10px] text-[#111111]/60 hover:text-[#111111] underline cursor-pointer"
               >
                 Forgot password?
@@ -136,6 +160,18 @@ export default function LoginPage() {
           CREATE ACCOUNT
         </Link>
       </div>
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={forgotModalOpen}
+        onClose={() => setForgotModalOpen(false)}
+        initialEmail={email}
+        onSuccess={(resetUserEmail) => {
+          setEmail(resetUserEmail);
+          setPassword("");
+          setSuccessMessage("Password reset successfully! Please log in with your new access key.");
+        }}
+      />
     </div>
   );
 }

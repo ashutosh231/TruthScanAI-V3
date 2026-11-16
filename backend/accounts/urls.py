@@ -12,6 +12,9 @@ from accounts.views import (
     LogoutView,
     UserProfileView,
     UploadAvatarView,
+    ForgotPasswordView,
+    VerifyResetOtpView,
+    ResetPasswordView,
 )
 
 auth_urlpatterns = [
@@ -19,6 +22,9 @@ auth_urlpatterns = [
     path("send-otp", SendOtpView.as_view(), name="auth-send-otp"),
     path("verify-otp", VerifyOtpView.as_view(), name="auth-verify-otp"),
     path("login", LoginView.as_view(), name="auth-login"),
+    path("forgot-password", ForgotPasswordView.as_view(), name="auth-forgot-password"),
+    path("verify-reset-otp", VerifyResetOtpView.as_view(), name="auth-verify-reset-otp"),
+    path("reset-password", ResetPasswordView.as_view(), name="auth-reset-password"),
     path("refresh", RefreshTokenView.as_view(), name="auth-refresh"),
     path("logout", LogoutView.as_view(), name="auth-logout"),
 ]

@@ -15,6 +15,9 @@ from accounts.views import (
     LogoutView,
     UserProfileView,
     UploadAvatarView,
+    ForgotPasswordView,
+    VerifyResetOtpView,
+    ResetPasswordView,
 )
 from factcheck.views import (
     CreateFactCheckView,
@@ -67,6 +70,12 @@ urlpatterns = [
     *create_route_pairs("auth/verify-otp", VerifyOtpView.as_view(), "auth-verify-otp"),
     *create_route_pairs("api/auth/login", LoginView.as_view(), "api-auth-login"),
     *create_route_pairs("auth/login", LoginView.as_view(), "auth-login"),
+    *create_route_pairs("api/auth/forgot-password", ForgotPasswordView.as_view(), "api-auth-forgot-password"),
+    *create_route_pairs("auth/forgot-password", ForgotPasswordView.as_view(), "auth-forgot-password"),
+    *create_route_pairs("api/auth/verify-reset-otp", VerifyResetOtpView.as_view(), "api-auth-verify-reset-otp"),
+    *create_route_pairs("auth/verify-reset-otp", VerifyResetOtpView.as_view(), "auth-verify-reset-otp"),
+    *create_route_pairs("api/auth/reset-password", ResetPasswordView.as_view(), "api-auth-reset-password"),
+    *create_route_pairs("auth/reset-password", ResetPasswordView.as_view(), "auth-reset-password"),
     *create_route_pairs("api/auth/refresh", RefreshTokenView.as_view(), "api-auth-refresh"),
     *create_route_pairs("auth/refresh", RefreshTokenView.as_view(), "auth-refresh"),
     *create_route_pairs("api/auth/logout", LogoutView.as_view(), "api-auth-logout"),

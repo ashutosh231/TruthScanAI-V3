@@ -106,3 +106,102 @@ class AccountsAuthIntegrationTests(TestCase):
                 cached_otp = cached_otp.decode("utf-8")
             self.assertIsNotNone(cached_otp)
             self.assertEqual(len(cached_otp), 6)
+
+    def test_forgot_password_flow(self):
+        from unittest.mock import patch
+        from accounts.services import hash_password
+        from datetime import datetime, timezone
+
+        test_email = f"reset_test_{self.id().lower().replace('.', '_')}@truthscan.ai"
+        initial_pw = "OriginalPass123!"
+        new_pw = "NewSecretPass456!"
+
+        # Clear any rate limit
+        try:
+            self.redis.delete(f"ratelimit:send-otp:{test_email}")
+            self.redis.delete(f"ratelimit:verify-otp:{test_email}")
+            self.redis.delete(f"ratelimit:login:{test_email}")
+        except Exception:
+            pass
+
+        # 1. Nonexistent email returns 404
+        res = self.client.post("/api/auth/forgot-password", {"email": "nobody_home@truthscan.ai"})
+        self.assertEqual(res.status_code, 404)
+
+        # Create user in MongoDB
+        now = datetime.now(timezone.utc)
+        self.users.insert_one({
+            "name": "Reset Test User",
+            "email": test_email,
+            "password": hash_password(initial_pw),
+            "isVerified": True,
+            "role": "user",
+            "createdAt": now,
+            "updatedAt": now,
+        })
+
+        # 2. Request forgot password OTP
+        with patch("core.utils._send_smtp_payload", return_value=True):
+            res = self.client.post("/api/auth/forgot-password", {"email": test_email})
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json().get("success"))
+
+        cached_otp = self.redis.get(f"reset_otp:{test_email}")
+        if isinstance(cached_otp, bytes):
+            cached_otp = cached_otp.decode("utf-8")
+        self.assertIsNotNone(cached_otp)
+        self.assertEqual(len(cached_otp), 6)
+
+        # 3. Verify OTP with bad code -> 400
+        res = self.client.post("/api/auth/verify-reset-otp", {
+            "email": test_email,
+            "otp": "999999" if cached_otp != "999999" else "000000",
+        })
+        self.assertEqual(res.status_code, 400)
+
+        # 4. Verify OTP with correct code -> 200
+        res = self.client.post("/api/auth/verify-reset-otp", {
+            "email": test_email,
+            "otp": cached_otp,
+        })
+        self.assertEqual(res.status_code, 200)
+
+        # 5. Reset password with short password -> 400
+        res = self.client.post("/api/auth/reset-password", {
+            "email": test_email,
+            "otp": cached_otp,
+            "newPassword": "123",
+        })
+        self.assertEqual(res.status_code, 400)
+
+        # 6. Reset password with correct OTP and valid new password -> 200
+        res = self.client.post("/api/auth/reset-password", {
+            "email": test_email,
+            "otp": cached_otp,
+            "newPassword": new_pw,
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json().get("success"))
+
+        # Invalidate check: OTP should now be cleared from cache
+        self.assertIsNone(self.redis.get(f"reset_otp:{test_email}"))
+
+        # 7. Old password should fail to login
+        res = self.client.post("/api/auth/login", {
+            "email": test_email,
+            "password": initial_pw,
+        })
+        self.assertEqual(res.status_code, 401)
+
+        # 8. New password should succeed
+        res = self.client.post("/api/auth/login", {
+            "email": test_email,
+            "password": new_pw,
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json().get("success"))
+        self.assertEqual(res.json()["data"]["user"]["email"], test_email)
+
+        # Clean up created test user
+        self.users.delete_one({"email": test_email})
+
