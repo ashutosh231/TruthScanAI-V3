@@ -2,11 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import Button from "./Button";
 import {
-  ShieldCheck,
   Menu,
   X,
   Scan,
@@ -14,21 +13,57 @@ import {
   Newspaper,
   CreditCard,
   FileText,
-  User,
   LogOut,
+  Shield,
 } from "lucide-react";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [adminUser, setAdminUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const adminStr =
+          sessionStorage.getItem("truthscan_admin_user") ||
+          localStorage.getItem("truthscan_admin_user");
+        const adminToken =
+          sessionStorage.getItem("truthscan_admin_token") ||
+          localStorage.getItem("truthscan_admin_token");
+        if (adminStr && adminToken) {
+          return JSON.parse(adminStr);
+        }
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    if (typeof window !== "undefined") {
+      try {
+        const adminStr =
+          sessionStorage.getItem("truthscan_admin_user") ||
+          localStorage.getItem("truthscan_admin_user");
+        const adminToken =
+          sessionStorage.getItem("truthscan_admin_token") ||
+          localStorage.getItem("truthscan_admin_token");
+        if (adminStr && adminToken) {
+          setAdminUser(JSON.parse(adminStr));
+        } else {
+          setAdminUser(null);
+        }
+      } catch {
+        setAdminUser(null);
+      }
+    }
+  }, [pathname]);
 
-  const navLinks = [
+  const rawNavLinks = [
     { name: "DETECT", href: "/detect", icon: Search },
     { name: "SCAN", href: "/scan", icon: Scan },
     { name: "NEWS", href: "/news", icon: Newspaper },
@@ -37,12 +72,49 @@ export default function Navbar() {
   ];
 
   const isActive = (href) => pathname === href;
+  const isOnAdminRoute = pathname?.startsWith("/admin");
+  const hasAdminRole =
+    String(user?.role || "").toLowerCase() === "admin" ||
+    String(adminUser?.role || "").toLowerCase() === "admin" ||
+    user?.isAdmin === true ||
+    adminUser?.isAdmin === true ||
+    user?.email === "id-admin@gmail.com" ||
+    adminUser?.email === "id-admin@gmail.com" ||
+    user?.email === "admin@gmail.com" ||
+    adminUser?.email === "admin@gmail.com";
+  const isAdminMode = hasAdminRole || isOnAdminRoute;
+  const isLoggedIn = isAuthenticated || !!adminUser;
+
+  // Filter out PLANS in admin mode - admin navbar persists across all routes
+  const navLinks = isAdminMode
+    ? rawNavLinks.filter((link) => link.name !== "PLANS")
+    : rawNavLinks;
+
+  const handleLogout = async () => {
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("truthscan_admin_token");
+      sessionStorage.removeItem("truthscan_admin_user");
+      localStorage.removeItem("truthscan_admin_token");
+      localStorage.removeItem("truthscan_admin_user");
+      sessionStorage.removeItem("truthscan_access_token");
+      sessionStorage.removeItem("truthscan_user_session");
+      localStorage.removeItem("truthscan_access_token");
+      localStorage.removeItem("truthscan_user_session");
+      setAdminUser(null);
+    }
+    await logout();
+    router.push("/login");
+  };
 
   return (
-    <header className="sticky top-0 z-40 w-full px-3 sm:px-6 pt-3 pb-2 bg-[#F5F1E8]/95 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full px-4 sm:px-6 lg:px-8 pt-3 pb-2 bg-[#F5F1E8]/95 backdrop-blur-md">
       <div className="max-w-7xl mx-auto border-2 border-[#111111] bg-[#F5F1E8] shadow-hard px-4 sm:px-6 py-3 flex items-center justify-between">
-        {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-2.5 group">
+        {/* Brand Logo - In admin mode, clicking logo navigates to /admin, never landing page */}
+        <Link
+          href={isAdminMode ? "/admin" : "/"}
+          className="flex items-center gap-2.5 group"
+          title={isAdminMode ? "TruthScan Admin Core" : "TruthScan AI"}
+        >
           <div className="w-10 h-10 bg-[#B7FF3C] border-2 border-[#111111] shadow-hard-xs group-hover:shadow-hard transition-all overflow-hidden flex items-center justify-center p-0.5 shrink-0">
             <img
               src="/image.png"
@@ -55,7 +127,7 @@ export default function Navbar() {
               TRUTHSCAN<span className="text-[#111111] font-mono-tech ml-1">AI</span>
             </span>
             <span className="font-mono-tech text-[9px] tracking-widest text-[#111111]/70 uppercase hidden sm:block">
-              INTELLIGENCE WIRE
+              {isAdminMode ? "ADMINISTRATOR CORE" : "INTELLIGENCE WIRE"}
             </span>
           </div>
         </Link>
@@ -84,7 +156,32 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-3">
           {!mounted ? (
             <div className="w-32 h-8" />
-          ) : isAuthenticated ? (
+          ) : isAdminMode ? (
+            /* ADMIN VIEW (PERSISTS ACROSS ALL ROUTES): No profile, no dashboard, only ADMIN + Logout */
+            <div className="flex items-center gap-2">
+              <Link href="/admin">
+                <div
+                  className={`flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#111111] font-display text-xs font-bold uppercase tracking-wider shadow-hard-xs transition-all cursor-pointer ${
+                    isOnAdminRoute
+                      ? "bg-[#B7FF3C] text-[#111111]"
+                      : "bg-[#111111] text-[#B7FF3C] hover:bg-[#B7FF3C] hover:text-[#111111]"
+                  }`}
+                  title="Administrator Portal"
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>ADMIN</span>
+                </div>
+              </Link>
+              <button
+                onClick={handleLogout}
+                title="Terminate Admin Session"
+                className="p-2 border-2 border-[#111111] bg-white hover:bg-[#FF4D4D] hover:text-white shadow-hard-xs transition-colors cursor-pointer"
+              >
+                <LogOut className="w-4 h-4 text-[#111111]" />
+              </button>
+            </div>
+          ) : isLoggedIn ? (
+            /* REGULAR USER VIEW */
             <div className="flex items-center gap-2">
               <Link href="/dashboard">
                 <Button
@@ -94,6 +191,7 @@ export default function Navbar() {
                   DASHBOARD
                 </Button>
               </Link>
+
               <Link
                 href="/profile"
                 className={`flex items-center gap-2 px-2.5 py-1.5 border-2 border-[#111111] shadow-hard-xs transition-all ${
@@ -118,8 +216,9 @@ export default function Navbar() {
                   PROFILE
                 </span>
               </Link>
+
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 title="Logout"
                 className="p-2 border-2 border-[#111111] bg-white hover:bg-[#FF4D4D] shadow-hard-xs transition-colors cursor-pointer"
               >
@@ -127,6 +226,7 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
+            /* GUEST VIEW */
             <div className="flex items-center gap-2.5">
               <Link href="/login">
                 <Button variant="outline" size="sm">
@@ -144,7 +244,13 @@ export default function Navbar() {
 
         {/* Mobile Hamburger Toggle */}
         <div className="flex items-center gap-2 lg:hidden">
-          {mounted && isAuthenticated && (
+          {mounted && isAdminMode ? (
+            <Link href="/admin">
+              <span className="font-display text-xs px-2 py-1 bg-[#B7FF3C] border-2 border-[#111111] font-bold">
+                ADMIN
+              </span>
+            </Link>
+          ) : mounted && isLoggedIn ? (
             <Link href="/profile" className="flex items-center">
               {user?.avatar ? (
                 <img
@@ -158,10 +264,10 @@ export default function Navbar() {
                 </div>
               )}
             </Link>
-          )}
+          ) : null}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 border-2 border-[#111111] bg-white shadow-hard-xs hover:bg-[#B7FF3C] transition-colors"
+            className="p-2 border-2 border-[#111111] bg-white shadow-hard-xs hover:bg-[#B7FF3C] transition-colors cursor-pointer"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -177,7 +283,7 @@ export default function Navbar() {
               SYSTEM NAVIGATION
             </span>
             <span className="inline-flex items-center gap-1 font-mono-tech text-[10px] bg-[#B7FF3C] border border-[#111111] px-2 py-0.5 font-bold">
-              LIVE
+              {isAdminMode ? "ADMIN LIVE" : "LIVE"}
             </span>
           </div>
 
@@ -205,7 +311,33 @@ export default function Navbar() {
           </nav>
 
           <div className="pt-3 border-t-2 border-[#111111] flex flex-col gap-2.5">
-            {mounted && isAuthenticated ? (
+            {mounted && isAdminMode ? (
+              /* Mobile drawer for Admin mode */
+              <>
+                <div className="p-3 border-2 border-[#111111] bg-[#111111] text-[#B7FF3C] flex justify-between items-center text-xs font-mono-tech font-bold">
+                  <span>ADMINISTRATOR: {adminUser?.email || user?.email || "id-admin@gmail.com"}</span>
+                </div>
+                <div className="flex gap-2">
+                  <Link href="/admin" className="flex-1" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="accent" size="md" className="w-full">
+                      ADMIN PORTAL
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    size="md"
+                    onClick={() => {
+                      handleLogout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="px-3"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </Button>
+                </div>
+              </>
+            ) : mounted && isLoggedIn ? (
+              /* Mobile drawer for Regular User */
               <>
                 <div className="p-3 border-2 border-[#111111] bg-white flex justify-between items-center text-xs font-mono-tech font-bold">
                   <span>LOGGED IN AS: {user?.name || user?.email}</span>
@@ -225,7 +357,7 @@ export default function Navbar() {
                     variant="outline"
                     size="md"
                     onClick={() => {
-                      logout();
+                      handleLogout();
                       setMobileMenuOpen(false);
                     }}
                     className="px-3"
@@ -235,6 +367,7 @@ export default function Navbar() {
                 </div>
               </>
             ) : (
+              /* Mobile drawer for Guest */
               <div className="grid grid-cols-2 gap-2">
                 <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                   <Button variant="outline" size="md" className="w-full">

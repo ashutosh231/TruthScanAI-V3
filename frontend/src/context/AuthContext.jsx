@@ -16,7 +16,11 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     if (typeof window !== "undefined") {
       try {
-        const storedUser = sessionStorage.getItem("truthscan_user_session");
+        const storedUser =
+          sessionStorage.getItem("truthscan_user_session") ||
+          localStorage.getItem("truthscan_user_session") ||
+          sessionStorage.getItem("truthscan_admin_user") ||
+          localStorage.getItem("truthscan_admin_user");
         return storedUser ? JSON.parse(storedUser) : null;
       } catch {
         return null;
@@ -28,7 +32,11 @@ export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(() => {
     if (typeof window !== "undefined") {
       try {
-        const token = sessionStorage.getItem("truthscan_access_token");
+        const token =
+          sessionStorage.getItem("truthscan_access_token") ||
+          localStorage.getItem("truthscan_access_token") ||
+          sessionStorage.getItem("truthscan_admin_token") ||
+          localStorage.getItem("truthscan_admin_token");
         if (token) {
           setAuthToken(token);
           return token;
@@ -190,6 +198,12 @@ export function AuthProvider({ children }) {
       try {
         sessionStorage.removeItem("truthscan_user_session");
         sessionStorage.removeItem("truthscan_access_token");
+        localStorage.removeItem("truthscan_user_session");
+        localStorage.removeItem("truthscan_access_token");
+        sessionStorage.removeItem("truthscan_admin_user");
+        sessionStorage.removeItem("truthscan_admin_token");
+        localStorage.removeItem("truthscan_admin_user");
+        localStorage.removeItem("truthscan_admin_token");
       } catch {
         // ignore
       }

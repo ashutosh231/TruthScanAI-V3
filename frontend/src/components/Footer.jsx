@@ -108,6 +108,11 @@ export default function Footer() {
                   MY TELEMETRY
                 </Link>
               </li>
+              <li>
+                <Link href="/login" className="text-[#B7FF3C] hover:underline font-bold transition-colors">
+                  ADMIN PORTAL
+                </Link>
+              </li>
             </ul>
           </div>
 
