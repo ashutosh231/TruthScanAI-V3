@@ -111,8 +111,4 @@ urlpatterns = [
     # Analytics routes (legacy/compat)
     *create_route_pairs("api/analytics", AnalyticsDashboardView.as_view(), "api-analytics"),
     *create_route_pairs("analytics", AnalyticsDashboardView.as_view(), "analytics"),
-
-    # Full Feature-Complete Admin Panel Routes
-    path("api/admin/", include("admin_panel.urls")),
-    path("admin/", include("admin_panel.urls")),
 ]

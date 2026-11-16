@@ -108,15 +108,3 @@ def fact_check_rate_limit(view_func):
         key_func=key_fn,
         message="Rate limit reached for fact checking queries. Please wait before submitting more claims.",
     )(view_func)
-
-def admin_login_rate_limit(view_func):
-    def key_fn(req):
-        email = (req.data.get("email") or "").lower().strip()
-        return f"admin_email:{email}" if email else f"admin_ip:{get_client_ip(req)}"
-    return redis_rate_limit(
-        prefix="admin-login",
-        limit=5,
-        window_seconds=600,
-        key_func=key_fn,
-        message="Too many administrative login attempts. Admin portal temporarily rate-limited for 10 minutes.",
-    )(view_func)

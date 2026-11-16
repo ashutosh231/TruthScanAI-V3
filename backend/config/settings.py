@@ -40,7 +40,6 @@ INSTALLED_APPS = [
     "research",
     "document_processing",
     "analytics",
-    "admin_panel",
 ]
 
 MIDDLEWARE = [

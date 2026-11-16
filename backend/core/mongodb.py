@@ -71,9 +71,6 @@ def get_activity_logs_collection():
 def get_ai_metrics_collection():
     return get_db()["ai_metrics"]
 
-def get_admin_settings_collection():
-    return get_db()["admin_settings"]
-
 def check_mongo_connection():
     """
     Pings MongoDB to verify connection health.
