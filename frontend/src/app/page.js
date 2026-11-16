@@ -2,9 +2,9 @@
 
 import React from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import Button from "@/components/Button";
 import NewsGrid from "@/components/NewsGrid";
+import LiveScanTelemetryCard from "@/components/LiveScanTelemetryCard";
 import {
   ShieldCheck,
   Search,
@@ -18,17 +18,6 @@ import {
   Lock,
   Globe2,
 } from "lucide-react";
-
-const ThreeHeroShape = dynamic(() => import("@/components/ThreeHeroShape"), {
-  ssr: false,
-  loading: () => (
-    <div className="relative w-full h-[360px] sm:h-[420px] border-3 border-[#111111] bg-[#0E1015] shadow-hard-lg flex items-center justify-center">
-      <div className="font-mono-tech text-xs text-[#B7FF3C] animate-pulse uppercase tracking-wider">
-        INITIALIZING 3D NEURAL CORE...
-      </div>
-    </div>
-  ),
-});
 
 export default function HomePage() {
   const pipelineSteps = [
@@ -117,9 +106,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right Column: Interactive 3D Animated Neural Core (5 cols) */}
+          {/* Right Column: Live Scan Telemetry & Multi-Model AI Card (5 cols) */}
           <div className="lg:col-span-5 flex items-center justify-center">
-            <ThreeHeroShape />
+            <LiveScanTelemetryCard />
           </div>
         </div>
       </section>
