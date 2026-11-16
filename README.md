@@ -4,8 +4,8 @@
 ### Advanced Optical Misinformation Intelligence & Forensic Fact-Checking Platform
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.3.6-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-20+-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
-[![Express.js](https://img.shields.io/badge/Express.js-5.2-lightgrey?style=for-the-badge&logo=express)](https://expressjs.com/)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python)](https://python.org/)
+[![Django](https://img.shields.io/badge/Django-DRF-092E20?style=for-the-badge&logo=django)](https://www.djangoproject.com/)
 [![AWS Bedrock](https://img.shields.io/badge/AWS_Bedrock-DeepSeek_V3.2-FF9900?style=for-the-badge&logo=amazonaws)](https://aws.amazon.com/bedrock/)
 [![Amazon Textract](https://img.shields.io/badge/Amazon_Textract-OCR_Engine-FF9900?style=for-the-badge&logo=amazonaws)](https://aws.amazon.com/textract/)
 [![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas_v9-47A248?style=for-the-badge&logo=mongodb)](https://www.mongodb.com/)
@@ -29,7 +29,7 @@
 
 ## 🏛️ System Architecture
 
-TruthScan AI is engineered as an enterprise-grade, decoupled monorepo comprising a Next.js 16 client, an Express.js REST API server, an asynchronous BullMQ background worker, and cloud infrastructure:
+TruthScan AI is engineered as an enterprise-grade, decoupled architecture comprising a Next.js 16 client, a Python + Django REST Framework API server, and cloud infrastructure:
 
 ```mermaid
 flowchart TD
@@ -39,21 +39,21 @@ flowchart TD
         Browser <--> NextApp
     end
 
-    subgraph API_GATEWAY["API SERVER #1 (Render Web Service)"]
-        Express["Express.js Server (Port 5000)<br/>CORS + Cookie-Parser + Multer"]
-        AuthCtrl["Auth Controller<br/>(JWT + OTP Verify)"]
-        ScanCtrl["Scan Controller<br/>(Buffer Ingestion)"]
-        FactCtrl["FactCheck Controller<br/>(Text / URL / File)"]
-        NewsCtrl["News Controller<br/>(5-min Cached Wire)"]
-        PayCtrl["Payment Controller<br/>(Razorpay Orders & Webhooks)"]
-        UserCtrl["User Profile Controller<br/>(Cloudinary Avatars)"]
+    subgraph API_GATEWAY["API SERVER (Render Web Service)"]
+        Django["Django REST Framework (Port 4000)<br/>CORS + PyJWT + PyMongo"]
+        AuthCtrl["Auth Views<br/>(JWT + Direct OTP Verify)"]
+        ScanCtrl["Scan Views<br/>(Buffer Ingestion)"]
+        FactCtrl["FactCheck Views<br/>(Text / URL / File)"]
+        NewsCtrl["News Views<br/>(5-min Cached Wire)"]
+        PayCtrl["Payment Views<br/>(Razorpay Orders & Webhooks)"]
+        UserCtrl["User Profile Views<br/>(Cloudinary Avatars)"]
 
-        Express --> AuthCtrl
-        Express --> ScanCtrl
-        Express --> FactCtrl
-        Express --> NewsCtrl
-        Express --> PayCtrl
-        Express --> UserCtrl
+        Django --> AuthCtrl
+        Django --> ScanCtrl
+        Django --> FactCtrl
+        Django --> NewsCtrl
+        Django --> PayCtrl
+        Django --> UserCtrl
     end
 
     subgraph CLOUD_AI["AWS INTELLIGENCE CORE"]
@@ -66,13 +66,8 @@ flowchart TD
         Redis[("Upstash Redis (TLS)<br/>(Sessions, Token Whitelists, News Cache)")]
     end
 
-    subgraph WORKER_TIER["BACKGROUND WORKER #2 (Render Web Service)"]
-        BullQueue["BullMQ Queue ('email-dispatch')"]
-        EmailWorker["emailWorker.js<br/>(Native HTTP Health Server)"]
-        Brevo["Brevo SMTP Relay<br/>(6-Digit OTP Delivery)"]
-        
-        BullQueue --> EmailWorker
-        EmailWorker --> Brevo
+    subgraph EMAIL_SERVICE["DIRECT EMAIL SERVICE"]
+        Brevo["Brevo SMTP Relay<br/>(Direct 6-Digit OTP Delivery)"]
     end
 
     subgraph EXTERNAL_SERVICES["THIRD-PARTY PROVIDERS"]
@@ -81,17 +76,17 @@ flowchart TD
         CloudinaryCDN["Cloudinary Media Storage"]
     end
 
-    NextApp -- "HTTPS + Bearer Token + httpOnly Cookie" --> Express
+    NextApp -- "HTTPS + Bearer Token + httpOnly Cookie" --> Django
     ScanCtrl -- "In-Memory Image Buffer" --> Textract
     Textract -- "Extracted Text Lines" --> Bedrock
     FactCtrl -- "Normalized Claim" --> Bedrock
     AuthCtrl -- "Revocation & Token Blacklist" --> Redis
-    AuthCtrl -- "Enqueue OTP Job" --> BullQueue
+    AuthCtrl -- "Direct SMTP Dispatch" --> Brevo
     NewsCtrl -- "Cached Articles" <--> Redis
     NewsCtrl -- "Wire Fallback" --> NewsAPI
     PayCtrl -- "Create Orders & Verify HMAC" --> RazorpayGateway
     UserCtrl -- "Avatar Upload" --> CloudinaryCDN
-    Express <--> MongoDB
+    Django <--> MongoDB
 ```
 
 ---
@@ -173,28 +168,24 @@ sequenceDiagram
     end
 ```
 
-### B. User Authentication & Background OTP Flow
+### B. User Authentication & Direct OTP Flow
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User as User
     participant Frontend as Next.js Frontend
-    participant Backend as Express API Server
+    participant Backend as Django API Server
     participant Redis as Upstash Redis
-    participant Queue as BullMQ ('email-dispatch')
-    participant Worker as emailWorker.js
-    participant Brevo as Brevo SMTP
+    participant Brevo as Brevo SMTP Relay
 
     User->>Frontend: Enters Registration Details
     Frontend->>Backend: POST /api/auth/register
-    Backend->>Backend: Hashes password (bcryptjs salt 10)
+    Backend->>Backend: Hashes password (bcrypt salt 12)
     Backend->>Backend: Generates 6-digit OTP
     Backend->>Redis: SET otp:user@domain.com (TTL: 300s)
-    Backend->>Queue: addEmailJob("send-otp", { email, otp })
+    Backend->>Brevo: Direct smtplib SMTP dispatch (with console fallback)
     Backend-->>Frontend: HTTP 201 "OTP dispatched"
-    Queue->>Worker: Worker picks up job
-    Worker->>Brevo: Transporter.sendMail()
     Brevo-->>User: OTP email arrives in inbox
     User->>Frontend: Enters OTP code
     Frontend->>Backend: POST /api/auth/verify-otp
@@ -212,14 +203,14 @@ sequenceDiagram
 |---|---|---|
 | **Frontend Framework** | Next.js 16 (App Router) | Turbopack, React 19, Lucide Icons, Canvas Viewfinder |
 | **Styling** | Vanilla CSS + Tailwind | Custom Neo-Brutalist design system (hard shadows, high contrast) |
-| **Backend Framework** | Express.js 5.2 | Node.js ES Modules, Cookie-Parser, Multer Memory Storage |
-| **Database** | MongoDB Atlas & Mongoose 9 | Relational-style document schemas for Users, FactChecks, and Payments |
-| **Caching & Storage** | Upstash Redis & `ioredis` | TLS-encrypted session tracking, token blacklisting, and news cache |
-| **Task Queue** | BullMQ 6 | Asynchronous background job processing with decoupled worker |
-| **AI Foundation Model** | AWS Bedrock (`deepseek.v3.2`) | Structured system prompt returning schema-validated forensic dossiers |
-| **OCR Service** | Amazon Textract | Server-side image decoding extracting `LINE` text blocks |
-| **Payment Gateway** | Razorpay Node.js SDK | ₹200.00 / month recurring subscription checkout & HMAC webhooks |
-| **Transactional Email** | Nodemailer & Brevo SMTP | High-deliverability HTML templates for account clearance OTPs |
+| **Backend Framework** | Django 5.x/6.x & DRF | Python, Django REST Framework, Gunicorn WSGI |
+| **Database** | MongoDB Atlas via PyMongo | Document-based integration for Users, FactChecks, and Payments |
+| **Caching & Storage** | Upstash Redis | Session tracking, token caching, rate limiting, and news wire cache |
+| **AI Foundation Model** | AWS Bedrock (`deepseek.v3.2`) | Boto3 AWS Bedrock Runtime returning schema-validated forensic dossiers |
+| **Research Engine** | Tavily Live Web Search | Empirical evidence collection with spam pattern suppression |
+| **OCR Service** | Amazon Textract + Fallback | Server-side image decoding extracting `LINE` text blocks + local OCR |
+| **Payment Gateway** | Razorpay Python SDK | ₹200.00 / month recurring subscription checkout & HMAC webhooks |
+| **Transactional Email** | Python smtplib + Brevo SMTP | High-deliverability HTML templates for account clearance OTPs |
 
 ---
 
@@ -245,7 +236,11 @@ cd TruthScanAI-V2
 
 ```bash
 cd backend
-npm install
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python manage.py test
+python manage.py runserver 0.0.0.0:4000
 ```
 
 Create `backend/.env` based on `backend/.env.example`:
@@ -279,17 +274,10 @@ RAZORPAY_KEY_SECRET=your_razorpay_secret_key
 RAZORPAY_WEBHOOK_SECRET=your_webhook_secret_key
 ```
 
-Run the Express API server:
+Run the Django REST Framework API server:
 ```bash
-npm run dev
-# Server running at http://localhost:5000 (API Base: http://localhost:5000/api)
-```
-
-In a separate terminal, launch the BullMQ Email Worker:
-```bash
-cd backend
-npm run worker
-# [Worker] Starting TruthScan AI Email Worker on queue: 'email-dispatch'...
+python manage.py runserver 0.0.0.0:4000
+# Server running at http://0.0.0.0:4000 (API Base: http://localhost:4000/api)
 ```
 
 ---
@@ -303,7 +291,7 @@ npm install
 
 Create `frontend/.env.local`:
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:5000/api
+NEXT_PUBLIC_API_URL=http://localhost:4000/api
 ```
 
 Start the Next.js development server:
@@ -321,16 +309,13 @@ FRONTEND:
 Next.js 16 App ──▶ Vercel (Root: frontend)
 
 BACKEND API:
-Express.js API ──▶ Render Web Service #1 (Root: backend, Start: npm start)
-
-BACKGROUND WORKER:
-BullMQ Worker  ──▶ Render Web Service #2 (Root: backend, Start: npm run worker)
+Django REST API ──▶ Render Web Service (Root: backend, Start: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --timeout 120)
 
 PERSISTENCE:
 Database       ──▶ MongoDB Atlas (IP: 0.0.0.0/0 allowed)
-Cache & Queue  ──▶ Upstash Redis (TLS rediss://)
+Cache          ──▶ Upstash Redis (TLS rediss://)
 AI & OCR       ──▶ AWS Bedrock + Amazon Textract
-Transactional  ──▶ Brevo SMTP
+Transactional  ──▶ Brevo SMTP (Direct delivery, no workers)
 Payments       ──▶ Razorpay (Webhook: https://YOUR-API.onrender.com/api/payments/webhook)
 ```
 
@@ -342,27 +327,16 @@ Payments       ──▶ Razorpay (Webhook: https://YOUR-API.onrender.com/api/pa
 - **Environment Variables**:
   - `NEXT_PUBLIC_API_URL`: `https://truthscan-backend.onrender.com/api`
 
-### 2. Render Web Service #1 (Express Backend)
+### 2. Render Web Service (Django Backend)
 - **Name**: `truthscan-backend`
 - **Root Directory**: `backend`
-- **Build Command**: `npm install`
-- **Start Command**: `npm start`
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 3 --timeout 120`
 - **Health Check Path**: `/api/health`
 - **Key Environment Variables**:
   - `NODE_ENV`: `production`
   - `CLIENT_URL`: `https://truthscan-frontend.vercel.app`
-  - `MONGO_URI`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AWS_*`, `RAZORPAY_*`
-
-### 3. Render Web Service #2 (BullMQ Worker)
-- **Name**: `truthscan-worker`
-- **Root Directory**: `backend`
-- **Build Command**: `npm install`
-- **Start Command**: `npm run worker`
-- **Health Check Path**: `/health` *(served via the lightweight internal health server on `$PORT`)*
-- **Key Environment Variables**:
-  - `NODE_ENV`: `production`
-  - `REDIS_URL`: *(Identical Upstash instance as Backend)*
-  - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`
+  - `MONGO_URI`, `REDIS_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `AWS_*`, `RAZORPAY_*`, `SMTP_*`
 
 ---
 
