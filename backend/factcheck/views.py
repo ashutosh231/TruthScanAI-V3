@@ -26,7 +26,7 @@ from document_processing.textract_service import (
     extract_text_from_image,
 )
 
-VALID_VERDICTS = [
+VALID_VERDICTS = {
     "TRUE",
     "FALSE",
     "MISLEADING",
@@ -34,7 +34,7 @@ VALID_VERDICTS = [
     "MIXED",
     "UNVERIFIED",
     "VERIFICATION_UNAVAILABLE",
-]
+}
 
 class CreateFactCheckView(APIView):
     """

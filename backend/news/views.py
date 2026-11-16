@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from core.mongodb import get_factchecks_collection, to_object_id
+from core.mongodb import get_factchecks_collection
 from core.utils import sanitize_public_report
 from news.services import get_latest_news, refresh_news_cache
 from ai_engine.bedrock_service import fact_check_with_ai

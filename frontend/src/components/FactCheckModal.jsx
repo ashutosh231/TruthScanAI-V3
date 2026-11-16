@@ -6,18 +6,18 @@ import { factCheckArticle } from "@/lib/api";
 import FactCheckResult from "./FactCheckResult";
 import ErrorState from "./ErrorState";
 
+const STEPS = [
+  "PARSING HEADLINE & CLAIMS...",
+  "CROSS-REFERENCING VERIFIED DATABASES...",
+  "EVALUATING SYNTACTIC INTEGRITY & BIAS...",
+  "FINALIZING NEURAL VERDICT...",
+];
+
 export default function FactCheckModal({ isOpen, onClose, article }) {
   const [loading, setLoading] = useState(true);
   const [pipelineStep, setPipelineStep] = useState(0);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-
-  const steps = [
-    "PARSING HEADLINE & CLAIMS...",
-    "CROSS-REFERENCING VERIFIED DATABASES...",
-    "EVALUATING SYNTACTIC INTEGRITY & BIAS...",
-    "FINALIZING NEURAL VERDICT...",
-  ];
 
   useEffect(() => {
     if (!isOpen || !article) {
@@ -35,7 +35,7 @@ export default function FactCheckModal({ isOpen, onClose, article }) {
 
     // Progressive step indicator
     const stepInterval = setInterval(() => {
-      setPipelineStep((prev) => (prev < steps.length - 1 ? prev + 1 : prev));
+      setPipelineStep((prev) => (prev < STEPS.length - 1 ? prev + 1 : prev));
     }, 380);
 
     // Call API factCheckArticle
@@ -108,7 +108,7 @@ export default function FactCheckModal({ isOpen, onClose, article }) {
 
               {/* Multi-step progress bars */}
               <div className="w-full max-w-md space-y-2 pt-2 text-left">
-                {steps.map((stepName, index) => {
+                {STEPS.map((stepName, index) => {
                   const isDone = index < pipelineStep;
                   const isCurrent = index === pipelineStep;
                   return (

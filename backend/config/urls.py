@@ -48,76 +48,55 @@ def health_check(request):
         "message": "TruthScan API is running",
     })
 
-def create_route_pairs(prefix, view, name):
-    """Creates both with and without trailing slash route patterns."""
-    clean_prefix = prefix.strip("/")
-    return [
-        path(clean_prefix, view, name=f"{name}-noslash"),
-        path(f"{clean_prefix}/", view, name=name),
-    ]
+def route_pairs(endpoint, view, base_name):
+    """Registers both /api/<endpoint> and /<endpoint> with and without trailing slash."""
+    clean = endpoint.strip("/")
+    routes = []
+    for prefix in [f"api/{clean}", clean]:
+        name_prefix = "api-" if prefix.startswith("api/") else ""
+        routes.append(path(prefix, view, name=f"{name_prefix}{base_name}-noslash"))
+        routes.append(path(f"{prefix}/", view, name=f"{name_prefix}{base_name}"))
+    return routes
 
 urlpatterns = [
     # Health checks
-    *create_route_pairs("health", health_check, "health-check"),
-    *create_route_pairs("api/health", health_check, "api-health-check"),
+    *route_pairs("health", health_check, "health-check"),
 
     # Auth routes
-    *create_route_pairs("api/auth/register", RegisterView.as_view(), "api-auth-register"),
-    *create_route_pairs("auth/register", RegisterView.as_view(), "auth-register"),
-    *create_route_pairs("api/auth/send-otp", SendOtpView.as_view(), "api-auth-send-otp"),
-    *create_route_pairs("auth/send-otp", SendOtpView.as_view(), "auth-send-otp"),
-    *create_route_pairs("api/auth/verify-otp", VerifyOtpView.as_view(), "api-auth-verify-otp"),
-    *create_route_pairs("auth/verify-otp", VerifyOtpView.as_view(), "auth-verify-otp"),
-    *create_route_pairs("api/auth/login", LoginView.as_view(), "api-auth-login"),
-    *create_route_pairs("auth/login", LoginView.as_view(), "auth-login"),
-    *create_route_pairs("api/auth/forgot-password", ForgotPasswordView.as_view(), "api-auth-forgot-password"),
-    *create_route_pairs("auth/forgot-password", ForgotPasswordView.as_view(), "auth-forgot-password"),
-    *create_route_pairs("api/auth/verify-reset-otp", VerifyResetOtpView.as_view(), "api-auth-verify-reset-otp"),
-    *create_route_pairs("auth/verify-reset-otp", VerifyResetOtpView.as_view(), "auth-verify-reset-otp"),
-    *create_route_pairs("api/auth/reset-password", ResetPasswordView.as_view(), "api-auth-reset-password"),
-    *create_route_pairs("auth/reset-password", ResetPasswordView.as_view(), "auth-reset-password"),
-    *create_route_pairs("api/auth/refresh", RefreshTokenView.as_view(), "api-auth-refresh"),
-    *create_route_pairs("auth/refresh", RefreshTokenView.as_view(), "auth-refresh"),
-    *create_route_pairs("api/auth/logout", LogoutView.as_view(), "api-auth-logout"),
-    *create_route_pairs("auth/logout", LogoutView.as_view(), "auth-logout"),
+    *route_pairs("auth/register", RegisterView.as_view(), "auth-register"),
+    *route_pairs("auth/send-otp", SendOtpView.as_view(), "auth-send-otp"),
+    *route_pairs("auth/verify-otp", VerifyOtpView.as_view(), "auth-verify-otp"),
+    *route_pairs("auth/login", LoginView.as_view(), "auth-login"),
+    *route_pairs("auth/forgot-password", ForgotPasswordView.as_view(), "auth-forgot-password"),
+    *route_pairs("auth/verify-reset-otp", VerifyResetOtpView.as_view(), "auth-verify-reset-otp"),
+    *route_pairs("auth/reset-password", ResetPasswordView.as_view(), "auth-reset-password"),
+    *route_pairs("auth/refresh", RefreshTokenView.as_view(), "auth-refresh"),
+    *route_pairs("auth/logout", LogoutView.as_view(), "auth-logout"),
 
     # User profile routes
-    *create_route_pairs("api/users/profile", UserProfileView.as_view(), "api-user-profile"),
-    *create_route_pairs("users/profile", UserProfileView.as_view(), "user-profile"),
-    *create_route_pairs("api/users/avatar", UploadAvatarView.as_view(), "api-user-avatar"),
-    *create_route_pairs("users/avatar", UploadAvatarView.as_view(), "user-avatar"),
+    *route_pairs("users/profile", UserProfileView.as_view(), "user-profile"),
+    *route_pairs("users/avatar", UploadAvatarView.as_view(), "user-avatar"),
 
     # Fact Check routes
-    *create_route_pairs("api/fact-check", CreateFactCheckView.as_view(), "api-factcheck-create"),
-    *create_route_pairs("fact-check", CreateFactCheckView.as_view(), "factcheck-create"),
-    *create_route_pairs("api/fact-check/file", CheckFileView.as_view(), "api-factcheck-file"),
-    *create_route_pairs("fact-check/file", CheckFileView.as_view(), "factcheck-file"),
-    *create_route_pairs("api/fact-check/history", FactCheckHistoryView.as_view(), "api-factcheck-history"),
-    *create_route_pairs("fact-check/history", FactCheckHistoryView.as_view(), "factcheck-history"),
+    *route_pairs("fact-check", CreateFactCheckView.as_view(), "factcheck-create"),
+    *route_pairs("fact-check/file", CheckFileView.as_view(), "factcheck-file"),
+    *route_pairs("fact-check/history", FactCheckHistoryView.as_view(), "factcheck-history"),
     re_path(r"^api/fact-check/(?P<pk>[a-zA-Z0-9]+)/?$", FactCheckDetailView.as_view(), name="api-factcheck-detail"),
     re_path(r"^fact-check/(?P<pk>[a-zA-Z0-9]+)/?$", FactCheckDetailView.as_view(), name="factcheck-detail"),
 
     # Scan routes
-    *create_route_pairs("api/scan", ScanNewsView.as_view(), "api-scan"),
-    *create_route_pairs("scan", ScanNewsView.as_view(), "scan"),
+    *route_pairs("scan", ScanNewsView.as_view(), "scan"),
 
     # News routes
-    *create_route_pairs("api/news", GetNewsView.as_view(), "api-news"),
-    *create_route_pairs("news", GetNewsView.as_view(), "news"),
-    *create_route_pairs("api/news/refresh", RefreshNewsView.as_view(), "api-news-refresh"),
-    *create_route_pairs("news/refresh", RefreshNewsView.as_view(), "news-refresh"),
-    *create_route_pairs("api/news/fact-check", FactCheckNewsArticleView.as_view(), "api-news-fact-check"),
-    *create_route_pairs("news/fact-check", FactCheckNewsArticleView.as_view(), "news-fact-check"),
+    *route_pairs("news", GetNewsView.as_view(), "news"),
+    *route_pairs("news/refresh", RefreshNewsView.as_view(), "news-refresh"),
+    *route_pairs("news/fact-check", FactCheckNewsArticleView.as_view(), "news-fact-check"),
 
     # Payment routes
-    *create_route_pairs("api/payments/create-order", CreateOrderView.as_view(), "api-payment-create-order"),
-    *create_route_pairs("payments/create-order", CreateOrderView.as_view(), "payment-create-order"),
-    *create_route_pairs("api/payments/verify", VerifyPaymentView.as_view(), "api-payment-verify"),
-    *create_route_pairs("payments/verify", VerifyPaymentView.as_view(), "payment-verify"),
-    *create_route_pairs("api/payments/webhook", WebhookView.as_view(), "api-payment-webhook"),
-    *create_route_pairs("payments/webhook", WebhookView.as_view(), "payment-webhook"),
+    *route_pairs("payments/create-order", CreateOrderView.as_view(), "payment-create-order"),
+    *route_pairs("payments/verify", VerifyPaymentView.as_view(), "payment-verify"),
+    *route_pairs("payments/webhook", WebhookView.as_view(), "payment-webhook"),
 
     # Analytics routes (legacy/compat)
-    *create_route_pairs("api/analytics", AnalyticsDashboardView.as_view(), "api-analytics"),
-    *create_route_pairs("analytics", AnalyticsDashboardView.as_view(), "analytics"),
+    *route_pairs("analytics", AnalyticsDashboardView.as_view(), "analytics"),
 ]

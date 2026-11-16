@@ -38,38 +38,29 @@ export default function NewsPage() {
     { id: "Climate", label: "CLIMATE" },
   ];
 
-  const fetchNews = useCallback(
-    async (cat = selectedCategory, isRefresh = false, q = activeQuery) => {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-      setError(null);
+  const fetchNews = useCallback(async (cat, isRefresh = false, q = "") => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
 
-      try {
-        let res;
-        if (isRefresh) {
-          res = await refreshNews(cat, q);
-        } else {
-          res = await getNews(cat, { q });
-        }
-
-        if (res && res.data) {
-          setArticles(res.data);
-          setLastRefreshed(new Date());
-        }
-      } catch (err) {
-        setError(err.message || "Failed to load news wire feed.");
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
+    try {
+      const res = isRefresh ? await refreshNews(cat, q) : await getNews(cat, { q });
+      if (res && res.data) {
+        setArticles(res.data);
+        setLastRefreshed(new Date());
       }
-    },
-    [selectedCategory, activeQuery]
-  );
+    } catch (err) {
+      setError(err.message || "Failed to load news wire feed.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   // Initial load or category change
   useEffect(() => {
     fetchNews(selectedCategory, false, activeQuery);
-  }, [selectedCategory]);
+  }, [selectedCategory, activeQuery, fetchNews]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();

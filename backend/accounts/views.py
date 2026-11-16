@@ -62,6 +62,38 @@ def set_refresh_cookie(response, token):
         samesite="None" if is_production else "Lax",
     )
 
+def build_auth_response(user, message):
+    """Constructs authenticated session response with JWT access token and refresh cookie."""
+    user_id_str = str(user["_id"])
+    role = user.get("role", "user")
+
+    access_token = generate_access_token({"userId": user_id_str, "role": role})
+    token_id = str(uuid.uuid4())
+    refresh_token = generate_refresh_token({"userId": user_id_str, "tokenId": token_id})
+
+    redis_client = get_redis_client()
+    redis_client.set(f"refresh:{token_id}", user_id_str, ex=REFRESH_TTL_SECONDS)
+
+    response = Response(
+        {
+            "success": True,
+            "message": message,
+            "data": {
+                "accessToken": access_token,
+                "user": {
+                    "id": user_id_str,
+                    "name": user.get("name", ""),
+                    "email": user.get("email", ""),
+                    "role": role,
+                    "isPremium": bool(user.get("isPremium", False)),
+                },
+            },
+        },
+        status=status.HTTP_200_OK,
+    )
+    set_refresh_cookie(response, refresh_token)
+    return response
+
 class RegisterView(APIView):
     """
     POST /api/auth/register
@@ -239,34 +271,7 @@ class VerifyOtpView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        user_id_str = str(user["_id"])
-        role = user.get("role", "user")
-
-        access_token = generate_access_token({"userId": user_id_str, "role": role})
-        token_id = str(uuid.uuid4())
-        refresh_token = generate_refresh_token({"userId": user_id_str, "tokenId": token_id})
-
-        redis_client.set(f"refresh:{token_id}", user_id_str, ex=REFRESH_TTL_SECONDS)
-
-        response = Response(
-            {
-                "success": True,
-                "message": "Account verified and authenticated successfully.",
-                "data": {
-                    "accessToken": access_token,
-                    "user": {
-                        "id": user_id_str,
-                        "name": user.get("name", ""),
-                        "email": user.get("email", ""),
-                        "role": role,
-                        "isPremium": bool(user.get("isPremium", False)),
-                    },
-                },
-            },
-            status=status.HTTP_200_OK,
-        )
-        set_refresh_cookie(response, refresh_token)
-        return response
+        return build_auth_response(user, "Account verified and authenticated successfully.")
 
 
 class LoginView(APIView):
@@ -310,35 +315,7 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        user_id_str = str(user["_id"])
-        role = user.get("role", "user")
-
-        access_token = generate_access_token({"userId": user_id_str, "role": role})
-        token_id = str(uuid.uuid4())
-        refresh_token = generate_refresh_token({"userId": user_id_str, "tokenId": token_id})
-
-        redis_client = get_redis_client()
-        redis_client.set(f"refresh:{token_id}", user_id_str, ex=REFRESH_TTL_SECONDS)
-
-        response = Response(
-            {
-                "success": True,
-                "message": "Login successful.",
-                "data": {
-                    "accessToken": access_token,
-                    "user": {
-                        "id": user_id_str,
-                        "name": user.get("name", ""),
-                        "email": user.get("email", ""),
-                        "role": role,
-                        "isPremium": bool(user.get("isPremium", False)),
-                    },
-                },
-            },
-            status=status.HTTP_200_OK,
-        )
-        set_refresh_cookie(response, refresh_token)
-        return response
+        return build_auth_response(user, "Login successful.")
 
 
 class ForgotPasswordView(APIView):

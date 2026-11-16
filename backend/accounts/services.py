@@ -3,22 +3,10 @@ Business logic and helpers for accounts and authentication.
 """
 
 import os
-import uuid
-from datetime import datetime, timezone
 import bcrypt
 import cloudinary
 import cloudinary.uploader
 from django.conf import settings
-
-from core.mongodb import get_users_collection, to_object_id
-from core.utils import (
-    generate_access_token,
-    generate_refresh_token,
-    verify_refresh_token,
-    generate_otp,
-    send_otp_email,
-    get_redis_client,
-)
 
 OTP_TTL_SECONDS = 300  # 5 minutes
 REFRESH_TTL_SECONDS = 7 * 24 * 60 * 60  # 7 days

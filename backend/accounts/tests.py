@@ -14,8 +14,10 @@ class AccountsAuthIntegrationTests(TestCase):
         self.users = get_users_collection()
         # Reset rate limit keys for tests to prevent test bleed
         try:
-            for key in ["ratelimit:send-otp:127.0.0.1", "ratelimit:login:127.0.0.1", "ratelimit:register:127.0.0.1"]:
-                self.redis.delete(key)
+            if hasattr(self.redis, "keys"):
+                keys = self.redis.keys("ratelimit:*")
+                if keys:
+                    self.redis.delete(*keys)
         except Exception:
             pass
 
@@ -108,15 +110,18 @@ class AccountsAuthIntegrationTests(TestCase):
             self.assertEqual(len(cached_otp), 6)
 
     def test_forgot_password_flow(self):
+        import uuid
         from unittest.mock import patch
         from accounts.services import hash_password
         from datetime import datetime, timezone
 
-        test_email = f"reset_test_{self.id().lower().replace('.', '_')}@truthscan.ai"
+        unique_suffix = uuid.uuid4().hex[:8]
+        test_email = f"reset_{unique_suffix}_{self.id().lower().replace('.', '_')}@truthscan.ai"
         initial_pw = "OriginalPass123!"
         new_pw = "NewSecretPass456!"
 
-        # Clear any rate limit
+        # Clear any rate limit and existing test user
+        self.users.delete_many({"email": test_email})
         try:
             self.redis.delete(f"ratelimit:send-otp:{test_email}")
             self.redis.delete(f"ratelimit:verify-otp:{test_email}")
@@ -125,7 +130,8 @@ class AccountsAuthIntegrationTests(TestCase):
             pass
 
         # 1. Nonexistent email returns 404
-        res = self.client.post("/api/auth/forgot-password", {"email": "nobody_home@truthscan.ai"})
+        nonexistent = f"nobody_{self.id().lower().replace('.', '_')}@truthscan.ai"
+        res = self.client.post("/api/auth/forgot-password", {"email": nonexistent})
         self.assertEqual(res.status_code, 404)
 
         # Create user in MongoDB
@@ -192,6 +198,14 @@ class AccountsAuthIntegrationTests(TestCase):
             "password": initial_pw,
         })
         self.assertEqual(res.status_code, 401)
+
+        # Clear login rate limit for test
+        try:
+            self.redis.delete(f"ratelimit:login:email:{test_email}")
+            self.redis.delete("ratelimit:login:ip:127.0.0.1")
+            self.redis.delete("ratelimit:login:127.0.0.1")
+        except Exception:
+            pass
 
         # 8. New password should succeed
         res = self.client.post("/api/auth/login", {

@@ -15,7 +15,6 @@ import {
   ArrowRight,
   Sparkles,
   Zap,
-  Lock,
   Globe2,
 } from "lucide-react";
 

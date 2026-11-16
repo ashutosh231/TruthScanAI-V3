@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { getNews } from "@/lib/api";
 import NewsCard from "./NewsCard";
 import { NewsSkeletonGrid } from "./LoadingState";
@@ -26,30 +26,33 @@ export default function NewsGrid({ initialCategory = "all", showTitle = true, li
     { id: "Climate", label: "CLIMATE" },
   ];
 
-  const fetchArticles = async (cat = selectedCategory, isRefresh = false) => {
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
-
-    try {
-      const res = await getNews(cat);
-      if (res && res.data) {
-        setNews(limit ? res.data.slice(0, limit) : res.data);
+  const fetchArticles = useCallback(
+    async (cat = selectedCategory, isRefresh = false) => {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
       }
-    } catch (err) {
-      setError(err.message || "Failed to load latest wire articles.");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+      setError(null);
+
+      try {
+        const res = await getNews(cat);
+        if (res && res.data) {
+          setNews(limit ? res.data.slice(0, limit) : res.data);
+        }
+      } catch (err) {
+        setError(err.message || "Failed to load latest wire articles.");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [limit, selectedCategory]
+  );
 
   useEffect(() => {
     fetchArticles(selectedCategory);
-  }, [selectedCategory]);
+  }, [selectedCategory, fetchArticles]);
 
   const handleRefresh = () => {
     fetchArticles(selectedCategory, true);
