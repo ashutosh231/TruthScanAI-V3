@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import Button from "@/components/Button";
 import NewsGrid from "@/components/NewsGrid";
 import {
@@ -17,6 +18,17 @@ import {
   Lock,
   Globe2,
 } from "lucide-react";
+
+const ThreeHeroShape = dynamic(() => import("@/components/ThreeHeroShape"), {
+  ssr: false,
+  loading: () => (
+    <div className="relative w-full h-[360px] sm:h-[420px] border-3 border-[#111111] bg-[#0E1015] shadow-hard-lg flex items-center justify-center">
+      <div className="font-mono-tech text-xs text-[#B7FF3C] animate-pulse uppercase tracking-wider">
+        INITIALIZING 3D NEURAL CORE...
+      </div>
+    </div>
+  ),
+});
 
 export default function HomePage() {
   const pipelineSteps = [
@@ -105,63 +117,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right Column: Visual Telemetry / Terminal Mockup (5 cols) */}
-          <div className="lg:col-span-5">
-            <div className="relative border-3 border-[#111111] bg-[#111111] text-[#F5F1E8] shadow-hard-lg p-6 space-y-5">
-              {/* Header */}
-              <div className="flex items-center justify-between pb-3 border-b-2 border-white/20">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-[#FF4D4D] border border-white" />
-                  <div className="w-3 h-3 bg-[#FFC857] border border-white" />
-                  <div className="w-3 h-3 bg-[#B7FF3C] border border-white" />
-                </div>
-                <span className="font-mono-tech text-xs text-[#B7FF3C] font-bold">
-                  VERIFY_ENGINE.SYS
-                </span>
-              </div>
-
-              {/* Sample Live Telemetry Analysis Card */}
-              <div className="space-y-3 font-mono-tech text-xs">
-                <div className="p-3 bg-white/5 border border-white/20 space-y-1">
-                  <span className="text-[#E8E2D5]/60 text-[10px] uppercase">
-                    INPUT INGESTION:
-                  </span>
-                  <p className="text-white font-bold text-sm">
-                    &ldquo;Deepfake audio shut down global banking networks&rdquo;
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[11px] text-[#E8E2D5]/80">
-                    <span>CROSS-REFERENCING CONSENSUS</span>
-                    <span className="text-[#B7FF3C]">94% COMPLETE</span>
-                  </div>
-                  <div className="h-3 bg-white/10 border border-white/40 p-[1px]">
-                    <div className="h-full bg-[#B7FF3C] w-[94%]" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  <div className="p-2 border border-white/20 bg-white/5">
-                    <span className="text-[10px] text-[#E8E2D5]/60 block">VERDICT</span>
-                    <span className="font-display text-sm text-[#FF4D4D] font-bold">
-                      FALSE (FABRICATED)
-                    </span>
-                  </div>
-                  <div className="p-2 border border-white/20 bg-white/5">
-                    <span className="text-[10px] text-[#E8E2D5]/60 block">CERTAINTY</span>
-                    <span className="font-display text-sm text-[#B7FF3C] font-bold">
-                      94% CONFIDENCE
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Floating Sticker Stamp */}
-              <div className="absolute -bottom-4 -right-4 bg-[#B7FF3C] text-[#111111] border-2 border-[#111111] shadow-hard font-display text-xs uppercase px-3 py-1 font-bold">
-                AUDITED BY TRUTHSCAN
-              </div>
-            </div>
+          {/* Right Column: Interactive 3D Animated Neural Core (5 cols) */}
+          <div className="lg:col-span-5 flex items-center justify-center">
+            <ThreeHeroShape />
           </div>
         </div>
       </section>
