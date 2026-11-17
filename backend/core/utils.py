@@ -13,6 +13,7 @@ import ipaddress
 import secrets
 import smtplib
 import threading
+import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from urllib.parse import urlparse
@@ -262,8 +263,10 @@ def generate_otp():
 
 def _send_smtp_payload(recipient_email, otp, purpose="verification"):
     """
-    Direct synchronous SMTP dispatch via Brevo or configured host.
+    Dispatches OTP email via Brevo HTTPS API (Port 443 - works on Render Free Tier)
+    or falls back to direct SMTP dispatch.
     """
+    brevo_api_key = getattr(settings, "BREVO_API_KEY", os.getenv("BREVO_API_KEY") or os.getenv("BREVO_KEY"))
     host = getattr(settings, "SMTP_HOST", os.getenv("SMTP_HOST", "smtp-relay.brevo.com"))
     port = int(getattr(settings, "SMTP_PORT", os.getenv("SMTP_PORT", 587)))
     user = getattr(settings, "SMTP_USER", os.getenv("SMTP_USER"))
@@ -271,9 +274,9 @@ def _send_smtp_payload(recipient_email, otp, purpose="verification"):
     from_email = getattr(settings, "FROM_EMAIL", os.getenv("FROM_EMAIL", "no-reply@truthscan.ai"))
     from_name = getattr(settings, "FROM_NAME", os.getenv("FROM_NAME", "TruthScan AI"))
 
-    if not password:
-        print("[EmailService] Warning: SMTP_PASS not set. Skipping SMTP dispatch.")
-        return False
+    # If SMTP_PASS is actually a Brevo v3 API key (starts with xkeysib-)
+    if not brevo_api_key and password and password.startswith("xkeysib-"):
+        brevo_api_key = password
 
     is_reset = purpose == "password reset"
     title_text = "TruthScan AI - Password Reset" if is_reset else "TruthScan AI"
@@ -312,6 +315,35 @@ def _send_smtp_payload(recipient_email, otp, purpose="verification"):
         </div>
       </div>
     """
+
+    # 1. Primary: Brevo HTTPS REST API (Uses port 443 - never blocked by cloud firewalls or Render Free Tier)
+    if brevo_api_key:
+        try:
+            url = "https://api.brevo.com/v3/smtp/email"
+            headers = {
+                "api-key": brevo_api_key,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            }
+            payload = {
+                "sender": {"name": from_name, "email": from_email},
+                "to": [{"email": recipient_email}],
+                "subject": subject_text,
+                "htmlContent": html_content,
+            }
+            res = requests.post(url, headers=headers, json=payload, timeout=10)
+            if res.status_code in (200, 201, 202):
+                print(f"[EmailService] OTP email successfully dispatched via Brevo HTTPS API to {recipient_email}")
+                return True
+            else:
+                print(f"[EmailService] Brevo HTTPS API note ({res.status_code}): {res.text}")
+        except Exception as e:
+            print(f"[EmailService] Brevo HTTPS API request failed: {e}")
+
+    # 2. Secondary fallback: Traditional SMTP socket dispatch
+    if not password:
+        print("[EmailService] Warning: Neither BREVO_API_KEY nor SMTP_PASS is set. Skipping email dispatch.")
+        return False
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject_text

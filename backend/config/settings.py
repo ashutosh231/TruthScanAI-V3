@@ -178,7 +178,8 @@ REFRESH_TOKEN_EXPIRES_IN = os.getenv("REFRESH_TOKEN_EXPIRES_IN", "7d")
 # Redis Configuration
 REDIS_URL = os.getenv("REDIS_URL")
 
-# SMTP Configuration
+# SMTP & Email API Configuration
+BREVO_API_KEY = os.getenv("BREVO_API_KEY") or os.getenv("BREVO_KEY")
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp-relay.brevo.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SMTP_USER = os.getenv("SMTP_USER")
