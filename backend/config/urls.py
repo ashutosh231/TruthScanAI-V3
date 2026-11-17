@@ -60,6 +60,7 @@ def route_pairs(endpoint, view, base_name):
 
 urlpatterns = [
     # Health checks
+    path("", health_check, name="root-health"),
     *route_pairs("health", health_check, "health-check"),
 
     # Auth routes

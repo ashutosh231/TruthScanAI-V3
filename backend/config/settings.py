@@ -45,6 +45,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.common.CommonMiddleware",
     "core.middleware.CentralizedErrorHandlingMiddleware",
 ]
@@ -87,6 +88,14 @@ APPEND_SLASH = False
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 
 # File upload limits (10MB body, 5MB max file upload)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -142,6 +151,19 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
     "x-razorpay-signature",
 ]
+
+# CSRF Trusted Origins for Render & Vercel deployment
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.vercel.app",
+    "https://*.onrender.com",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+if CLIENT_URL:
+    for origin in CLIENT_URL.split(","):
+        origin = origin.strip()
+        if origin and origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
 
 # MongoDB Configuration
 MONGO_URI = os.getenv("MONGO_URI")
