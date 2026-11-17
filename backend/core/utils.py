@@ -321,9 +321,9 @@ def _send_smtp_payload(recipient_email, otp, purpose="verification"):
 
     try:
         if port == 465:
-            server = smtplib.SMTP_SSL(host, port, timeout=5)
+            server = smtplib.SMTP_SSL(host, port, timeout=15)
         else:
-            server = smtplib.SMTP(host, port, timeout=5)
+            server = smtplib.SMTP(host, port, timeout=15)
             server.starttls()
         server.login(user, password)
         server.sendmail(from_email, [recipient_email], msg.as_string())
